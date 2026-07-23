@@ -236,6 +236,8 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 .calendar-day strong { display:block;margin-top:10px;color:var(--ink);font-size:11px;white-space:nowrap; }
 .calendar-day.blank { visibility:hidden; }
 .calendar-day.worked { border-color:#cad8ca;background:var(--green-soft); }
+.calendar-day.overtime { border-color:#e2b8b2;background:#f4deda; }
+.calendar-day.overtime strong { color:#8f3028; }
 .calendar-day.today { outline:2px solid var(--green);outline-offset:-2px; }
 .calendar-note { margin:14px 0 0;color:var(--muted);font-size:11px;text-align:center; }
 [hidden] { display:none!important; }

@@ -409,10 +409,14 @@ function renderCalendar() {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const record = recordMap.get(key);
     const seconds = record ? (key === activeDate ? workedSeconds(record) : record.workedSeconds || 0) : 0;
+    const isOvertime = Boolean(
+      record && (record.limitState === "overtime" || seconds > record.limitSeconds)
+    );
     const cell = document.createElement("div");
-    cell.className = `calendar-day${key === activeDate ? " today" : ""}${seconds ? " worked" : ""}`;
+    const workStatus = seconds ? (isOvertime ? " overtime" : " worked") : "";
+    cell.className = `calendar-day${key === activeDate ? " today" : ""}${workStatus}`;
     cell.innerHTML = `<span>${day}</span><strong>${formatDuration(seconds, true)}</strong>`;
-    cell.title = `${key}：${formatDuration(seconds)}`;
+    cell.title = `${key}：${formatDuration(seconds)}${isOvertime ? "（已超時）" : ""}`;
     $("calendar-grid").append(cell);
   }
 }
