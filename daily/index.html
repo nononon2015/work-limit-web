@@ -18,7 +18,7 @@
   <meta name="twitter:description" content="每天的工作，要有上限。">
   <meta name="twitter:image" content="https://nononon2015.github.io/work-limit-web/daily/og.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=3">
+  <link rel="stylesheet" href="./style.css?v=4">
   <title>到點就停｜每日工作限時</title>
 </head>
 <body>
@@ -53,6 +53,7 @@
         <span class="clock-label" id="clock-label">今日剩餘</span>
         <div class="clock" id="clock" aria-live="polite">08:00:00</div>
         <p class="clock-hint" id="clock-hint">上限 8 小時 · 尚未開始</p>
+        <button class="edit-limit" id="edit-limit" type="button" hidden>修改今日上限</button>
         <div class="progress-track" aria-label="今日工作進度"><span id="progress"></span></div>
       </div>
 
@@ -70,7 +71,6 @@
       </div>
 
       <button class="main-action" id="main-action" type="button">開始工作</button>
-      <button class="edit-limit" id="edit-limit" type="button" hidden>修改今日上限</button>
       <button class="end-work-button" id="end-work" type="button" hidden>結束工作</button>
 
       <div class="ticker" id="ticker" role="status" aria-live="polite" hidden>
