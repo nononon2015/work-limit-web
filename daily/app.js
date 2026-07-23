@@ -29,11 +29,21 @@ function saveStore() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
+function preferredLimit() {
+  if (Number.isFinite(store.lastLimitSeconds) && store.lastLimitSeconds >= 60) {
+    return store.lastLimitSeconds;
+  }
+  const latestKey = Object.keys(store.records).sort().reverse().find(
+    (key) => Number.isFinite(store.records[key]?.limitSeconds) && store.records[key].limitSeconds >= 60
+  );
+  return latestKey ? store.records[latestKey].limitSeconds : DEFAULT_LIMIT;
+}
+
 function getRecord(key = activeDate) {
   if (!store.records[key]) {
     store.records[key] = {
       workedSeconds: 0,
-      limitSeconds: DEFAULT_LIMIT,
+      limitSeconds: preferredLimit(),
       runningSince: null,
       reminders: []
     };
@@ -100,6 +110,7 @@ function recoverOvernightRun() {
   let [key, record] = runningEntry;
   let cursor = Number(record.runningSince);
   const inheritedLimit = record.limitSeconds || DEFAULT_LIMIT;
+  store.lastLimitSeconds = inheritedLimit;
   record.runningSince = null;
 
   while (key !== activeDate) {
@@ -129,9 +140,9 @@ function rollOverIfNeeded() {
   }
 
   const previousLimit = previous.limitSeconds || DEFAULT_LIMIT;
+  store.lastLimitSeconds = previousLimit;
   activeDate = nowKey;
   const today = getRecord();
-  if (!today.limitSeconds) today.limitSeconds = previousLimit;
   if (wasRunning && !today.runningSince) {
     const midnight = new Date();
     midnight.setHours(0, 0, 0, 0);
@@ -214,6 +225,7 @@ function setLimit() {
   const record = getRecord();
   record.limitSeconds = total;
   record.reminders = [];
+  store.lastLimitSeconds = total;
   saveStore();
   $("limit-panel").hidden = true;
   $("edit-limit").hidden = Boolean(record.runningSince);
