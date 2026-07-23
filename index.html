@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f0e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="到点就停">
+  <meta name="description" content="给工作设一个终点，保护你的休息时间。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <title>到点就停｜工作限时器</title>
+</head>
+<body>
+<main class="shell" id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">止</span><span>到点就停</span></div>
+    <div class="today-pill">今日 <span id="today-minutes">0</span> 分钟</div>
+  </header>
+  <section class="hero" aria-labelledby="timer-title">
+    <p class="eyebrow" id="state-label">保护你的下班时间</p>
+    <h1 id="timer-title">工作有终点，<br>生活才有空间。</h1>
+    <p class="intro">给这段工作设一个清晰边界。时间一到，就停下来。</p>
+    <div class="timer-card">
+      <div class="progress-track" aria-hidden="true"><span id="progress"></span></div>
+      <div class="duration-picker" id="duration-picker" aria-label="选择工作时长">
+        <button data-minutes="25">25<small>分钟</small></button>
+        <button data-minutes="45" class="selected">45<small>分钟</small></button>
+        <button data-minutes="60">60<small>分钟</small></button>
+      </div>
+      <div id="timer-state">
+        <div class="clock-wrap">
+          <span class="clock-label" id="clock-label">剩余</span>
+          <div class="clock" id="clock" aria-live="polite">45:00</div>
+          <p class="clock-hint" id="clock-hint">准备开始 45 分钟的工作</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="pause" hidden>暂停</button>
+        <button class="primary" id="main-action">开始工作</button>
+      </div>
+    </div>
+    <div class="notice" id="notice" role="alert" hidden></div>
+  </section>
+  <section class="stats" aria-labelledby="stats-title">
+    <div><p class="eyebrow">今天</p><h2 id="stats-title">守住边界的记录</h2></div>
+    <div class="stat-grid">
+      <article><strong id="session-count">0</strong><span>完成次数</span></article>
+      <article><strong id="work-minutes">0</strong><span>工作分钟</span></article>
+      <article><strong id="overtime-minutes">0</strong><span>超时分钟</span></article>
+    </div>
+    <p class="privacy">记录只保存在这台设备上。</p>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

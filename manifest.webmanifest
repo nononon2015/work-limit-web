@@ -1,0 +1,11 @@
+{
+  "name": "到点就停｜工作限时器",
+  "short_name": "到点就停",
+  "description": "给工作设一个终点，保护你的休息时间。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f0e8",
+  "theme_color": "#f4f0e8",
+  "lang": "zh-CN"
+}
