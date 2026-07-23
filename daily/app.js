@@ -7,6 +7,7 @@ let store = loadStore();
 let activeDate = dateKey();
 let calendarCursor = new Date();
 let tickerTimer;
+let finishCelebrationTimer;
 let audioContext;
 
 function dateKey(date = new Date()) {
@@ -236,6 +237,62 @@ function playTones(notes) {
   });
 }
 
+function playVictoryFanfare() {
+  if (store.muted) return;
+  const context = ensureAudioContext();
+  if (!context) return;
+  const start = context.currentTime + 0.03;
+
+  const playNote = (frequency, at, duration, volume = 0.16) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(frequency, start + at);
+    gain.gain.setValueAtTime(0.0001, start + at);
+    gain.gain.exponentialRampToValueAtTime(volume, start + at + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + at + duration);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(start + at);
+    oscillator.stop(start + at + duration + 0.03);
+  };
+
+  const playDrum = (at) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(150, start + at);
+    oscillator.frequency.exponentialRampToValueAtTime(48, start + at + 0.18);
+    gain.gain.setValueAtTime(0.28, start + at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 0.2);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(start + at);
+    oscillator.stop(start + at + 0.22);
+  };
+
+  playDrum(0);
+  playDrum(0.3);
+  playDrum(0.6);
+  playNote(392, 0, 0.2);
+  playNote(523.25, 0.18, 0.2);
+  playNote(659.25, 0.36, 0.22);
+  playNote(783.99, 0.56, 0.3, 0.2);
+  [523.25, 659.25, 783.99, 1046.5].forEach((frequency) => playNote(frequency, 0.86, 0.78, 0.11));
+}
+
+function showFinishCelebration(total) {
+  const celebration = $("finish-celebration");
+  $("finish-celebration-time").textContent = formatDuration(total);
+  clearTimeout(finishCelebrationTimer);
+  celebration.hidden = false;
+  celebration.classList.remove("play");
+  void celebration.offsetWidth;
+  celebration.classList.add("play");
+  finishCelebrationTimer = setTimeout(() => {
+    celebration.hidden = true;
+    celebration.classList.remove("play");
+  }, 3500);
+}
+
 function enterLimitReached(record) {
   record.workedSeconds = record.limitSeconds;
   record.runningSince = null;
@@ -287,6 +344,7 @@ function recordedSeconds(record, key) {
 }
 
 function finishToday() {
+  ensureAudioContext();
   const record = getRecord();
   commitElapsed(record);
   const total = workedSeconds(record);
@@ -299,6 +357,8 @@ function finishToday() {
   $("end-work-dialog").close();
   showTicker(`今天已記錄 ${formatDuration(total)}，工作結束。`);
   render();
+  playVictoryFanfare();
+  showFinishCelebration(total);
 }
 
 function renderMuteButton() {
@@ -458,6 +518,10 @@ $("main-action").addEventListener("click", toggleWork);
 $("end-work").addEventListener("click", () => $("end-work-dialog").showModal());
 $("confirm-finish").addEventListener("click", finishToday);
 $("cancel-finish").addEventListener("click", () => $("end-work-dialog").close());
+$("finish-celebration").addEventListener("click", () => {
+  clearTimeout(finishCelebrationTimer);
+  $("finish-celebration").hidden = true;
+});
 $("end-work-dialog").addEventListener("click", (event) => {
   if (event.target === $("end-work-dialog")) $("end-work-dialog").close();
 });

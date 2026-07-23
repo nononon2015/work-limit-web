@@ -1,5 +1,5 @@
-const CACHE = "stopwork-daily-v11";
-const ASSETS = ["./", "./index.html", "./style.css?v=6", "./app.js?v=10", "./manifest.webmanifest", "./icon.svg", "./og.png"];
+const CACHE = "stopwork-daily-v12";
+const ASSETS = ["./", "./index.html", "./style.css?v=7", "./app.js?v=11", "./manifest.webmanifest", "./icon.svg", "./og.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));

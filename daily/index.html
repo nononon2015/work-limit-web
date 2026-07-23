@@ -18,7 +18,7 @@
   <meta name="twitter:description" content="每天的工作，要有上限。">
   <meta name="twitter:image" content="https://nononon2015.github.io/work-limit-web/daily/og.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=6">
+  <link rel="stylesheet" href="./style.css?v=7">
   <title>到點就停｜每日工作限時</title>
 </head>
 <body>
@@ -117,6 +117,20 @@
     </div>
   </dialog>
 
-  <script src="./app.js?v=10"></script>
+  <div class="finish-celebration" id="finish-celebration" role="status" aria-live="assertive" hidden>
+    <div class="victory-rays" aria-hidden="true"></div>
+    <div class="victory-confetti" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="victory-card">
+      <div class="victory-star" aria-hidden="true">★</div>
+      <p>今天完成了！</p>
+      <strong id="finish-celebration-time"></strong>
+      <span>工作記錄已保存</span>
+    </div>
+  </div>
+
+  <script src="./app.js?v=11"></script>
 </body>
 </html>
