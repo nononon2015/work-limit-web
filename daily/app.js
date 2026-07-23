@@ -7,6 +7,7 @@ let store = loadStore();
 let activeDate = dateKey();
 let calendarCursor = new Date();
 let tickerTimer;
+let audioContext;
 
 function dateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -159,8 +160,7 @@ function reminderCandidates(record, worked) {
     { key: "two-thirds", due: worked >= record.limitSeconds * 2 / 3, text: "今天的工作時間已使用三分之二。" },
     { key: "30-minutes", due: remaining <= 30 * 60 && remaining > 0, text: "距離今日工作上限還有 30 分鐘，請開始收尾。" },
     { key: "10-minutes", due: remaining <= 10 * 60 && remaining > 0, text: "距離今日工作上限只剩 10 分鐘。" },
-    { key: "5-minutes", due: remaining <= 5 * 60 && remaining > 0, text: "最後 5 分鐘，請保存工作並準備停止。" },
-    { key: "overtime", due: remaining <= 0, text: "今天已超時工作，現在就停下來休息。" }
+    { key: "5-minutes", due: remaining <= 5 * 60 && remaining > 0, text: "最後 5 分鐘，請保存工作並準備停止。" }
   ];
   return candidates.filter((item) => item.due && !record.reminders.includes(item.key));
 }
@@ -173,7 +173,7 @@ function checkReminders(record, worked) {
   due.forEach((item) => record.reminders.push(item.key));
   saveStore();
   const reminder = due[due.length - 1];
-  broadcast(reminder.text, reminder.key === "overtime");
+  broadcast(reminder.text);
 }
 
 function showTicker(message, persistent = false) {
@@ -207,15 +207,88 @@ function broadcast(message, persistent = false) {
   }
 }
 
+function ensureAudioContext() {
+  if (!audioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioContext = new AudioContextClass();
+  }
+  audioContext?.resume?.();
+  return audioContext;
+}
+
+function playTones(notes) {
+  if (store.muted) return;
+  const context = ensureAudioContext();
+  if (!context) return;
+  let cursor = context.currentTime + 0.03;
+  notes.forEach(({ frequency, duration, gap = 0.08 }) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, cursor);
+    gain.gain.setValueAtTime(0.0001, cursor);
+    gain.gain.exponentialRampToValueAtTime(0.22, cursor + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, cursor + duration);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(cursor);
+    oscillator.stop(cursor + duration + 0.02);
+    cursor += duration + gap;
+  });
+}
+
+function enterLimitReached(record) {
+  record.workedSeconds = record.limitSeconds;
+  record.runningSince = null;
+  record.limitState = "awaiting";
+  if (!record.reminders.includes("limit-reached")) record.reminders.push("limit-reached");
+  saveStore();
+  playTones([
+    { frequency: 880, duration: 0.14, gap: 0.08 },
+    { frequency: 660, duration: 0.24 }
+  ]);
+  if (!store.muted) navigator.vibrate?.([240, 120, 320]);
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("今日工作已達限額", {
+      body: "是否停止工作？",
+      icon: "./icon.svg",
+      silent: Boolean(store.muted)
+    });
+  }
+}
+
+function continueOvertime() {
+  const record = getRecord();
+  ensureAudioContext();
+  record.workedSeconds = Math.max(record.limitSeconds, record.workedSeconds);
+  record.limitState = "overtime";
+  record.runningSince = Date.now();
+  saveStore();
+  render();
+}
+
+function confirmStop() {
+  const record = getRecord();
+  record.workedSeconds = record.limitSeconds;
+  record.runningSince = null;
+  record.limitState = "stopped";
+  saveStore();
+  playTones([
+    { frequency: 659.25, duration: 0.22, gap: 0.11 },
+    { frequency: 987.77, duration: 0.38 }
+  ]);
+  render();
+}
+
 function renderMuteButton() {
   const muted = Boolean(store.muted);
-  $("mute-toggle").textContent = muted ? "已靜音" : "語音開啟";
+  $("mute-toggle").textContent = muted ? "已靜音" : "聲音開啟";
   $("mute-toggle").setAttribute("aria-pressed", String(muted));
-  $("mute-toggle").title = muted ? "點擊恢復語音提醒" : "點擊關閉語音和震動";
+  $("mute-toggle").title = muted ? "點擊恢復提醒聲音" : "點擊關閉語音、提示音和震動";
 }
 
 async function toggleWork() {
   rollOverIfNeeded();
+  ensureAudioContext();
   const record = getRecord();
   if (record.runningSince) {
     commitElapsed(record);
@@ -256,13 +329,19 @@ function syncLimitInputs(record = getRecord()) {
 function render() {
   rollOverIfNeeded();
   const record = getRecord();
-  const worked = workedSeconds(record);
+  let worked = workedSeconds(record);
+  if (!record.limitState && worked >= record.limitSeconds) {
+    enterLimitReached(record);
+    worked = workedSeconds(record);
+  }
   const remaining = record.limitSeconds - worked;
-  const overtime = remaining <= 0;
+  const atLimitDecision = record.limitState === "awaiting" || record.limitState === "stopped";
+  const overtime = record.limitState === "overtime" && remaining <= 0;
   const hasStarted = worked > 0 || Boolean(record.runningSince);
 
   checkReminders(record, worked);
   $("app").classList.toggle("is-overtime", overtime);
+  $("app").classList.toggle("is-celebrating", record.limitState === "awaiting");
   $("today-worked").textContent = formatClock(worked);
   $("clock-label").textContent = overtime ? "今天已超時工作" : "今日剩餘";
   $("clock").textContent = overtime ? `+${formatClock(Math.abs(remaining))}` : formatClock(remaining);
@@ -271,10 +350,19 @@ function render() {
   $("clock-hint").textContent = `${record.runningSince ? "工作中" : hasStarted ? "已暫停" : "尚未開始"} · 上限 ${formatDuration(record.limitSeconds)}`;
   $("main-action").textContent = record.runningSince ? "暫停工作" : hasStarted ? "繼續工作" : "開始工作";
   $("main-action").classList.toggle("pause-mode", Boolean(record.runningSince));
-  $("edit-limit").hidden = Boolean(record.runningSince) || !$("limit-panel").hidden;
+  $("clock-stage").hidden = atLimitDecision;
+  $("limit-reached").hidden = !atLimitDecision;
+  $("main-action").hidden = atLimitDecision;
+  $("edit-limit").hidden = atLimitDecision || Boolean(record.runningSince) || !$("limit-panel").hidden;
+  $("confirm-stop").hidden = record.limitState === "stopped";
+  $("reached-question").textContent = record.limitState === "stopped" ? "很好，今天的工作已經停止。" : "是否停止工作？";
   renderMuteButton();
 
-  if (overtime) {
+  if (atLimitDecision) {
+    $("limit-panel").hidden = true;
+    $("state-label").textContent = record.limitState === "stopped" ? "今天的工作已經完成" : "做到了，現在可以安心停下來";
+    $("ticker").hidden = true;
+  } else if (overtime) {
     clearTimeout(tickerTimer);
     $("ticker-text").textContent = "今天已超時工作，請保存手上的內容，現在就停止工作。";
     $("ticker-copy").textContent = $("ticker-text").textContent;
@@ -330,6 +418,8 @@ function renderCalendar() {
 }
 
 $("main-action").addEventListener("click", toggleWork);
+$("confirm-stop").addEventListener("click", confirmStop);
+$("continue-overtime").addEventListener("click", continueOvertime);
 $("mute-toggle").addEventListener("click", () => {
   store.muted = !store.muted;
   saveStore();
@@ -338,7 +428,7 @@ $("mute-toggle").addEventListener("click", () => {
     navigator.vibrate?.(0);
   }
   renderMuteButton();
-  showTicker(store.muted ? "已靜音：只顯示文字和無聲通知。" : "語音提醒已恢復。");
+  showTicker(store.muted ? "已靜音：只顯示文字和無聲通知。" : "提醒聲音已恢復。");
 });
 $("save-limit").addEventListener("click", setLimit);
 $("edit-limit").addEventListener("click", () => {

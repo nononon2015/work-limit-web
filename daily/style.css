@@ -106,6 +106,75 @@ button { cursor:pointer; }
 .clock-hint { margin:0;color:var(--muted);font-size:13px; }
 .progress-track { width:min(580px,86%);height:5px;margin:28px auto 0;overflow:hidden;border-radius:99px;background:#dfddd6; }
 .progress-track span { display:block;width:0;height:100%;border-radius:inherit;background:var(--green);transition:width .5s linear; }
+.limit-reached {
+  position:relative;
+  width:min(620px,100%);
+  padding:28px 20px 8px;
+}
+.victory-mark {
+  display:grid;
+  place-items:center;
+  width:76px;
+  height:76px;
+  margin:0 auto 18px;
+  border-radius:50%;
+  color:#fff;
+  background:#3f765d;
+  box-shadow:0 14px 40px rgba(49,95,74,.22);
+  font-size:36px;
+  font-weight:850;
+  animation:victory-pop .7s cubic-bezier(.2,.9,.25,1.25) both;
+}
+.limit-reached h2 {
+  margin:0;
+  font-family:Georgia,"Songti TC","Songti SC",serif;
+  font-size:clamp(34px,7vw,54px);
+  font-weight:600;
+}
+.limit-reached p { margin:12px 0 24px;color:var(--muted);font-size:18px; }
+.decision-actions { display:flex;justify-content:center;gap:10px; }
+.decision-actions button {
+  min-width:160px;
+  min-height:54px;
+  padding:0 22px;
+  border:0;
+  border-radius:16px;
+  color:#fff;
+  font-weight:800;
+  box-shadow:0 11px 28px rgba(23,32,27,.13);
+}
+.stop-yes { background:#3f765d; }
+.continue-overtime { background:var(--red); }
+.confetti { position:absolute;inset:0;pointer-events:none;overflow:visible; }
+.confetti i {
+  position:absolute;
+  top:18%;
+  left:50%;
+  width:9px;
+  height:18px;
+  border-radius:2px;
+  background:#d8a63f;
+  opacity:0;
+  animation:confetti-fall 1.9s ease-out both;
+}
+.confetti i:nth-child(2n) { background:#4c8066; }
+.confetti i:nth-child(3n) { background:#cf6458; }
+.confetti i:nth-child(1) { --x:-260px;--r:120deg;animation-delay:.02s; }
+.confetti i:nth-child(2) { --x:-205px;--r:250deg;animation-delay:.13s; }
+.confetti i:nth-child(3) { --x:-150px;--r:190deg;animation-delay:.05s; }
+.confetti i:nth-child(4) { --x:-90px;--r:310deg;animation-delay:.18s; }
+.confetti i:nth-child(5) { --x:-35px;--r:150deg;animation-delay:.09s; }
+.confetti i:nth-child(6) { --x:35px;--r:290deg;animation-delay:.15s; }
+.confetti i:nth-child(7) { --x:95px;--r:170deg;animation-delay:.03s; }
+.confetti i:nth-child(8) { --x:155px;--r:330deg;animation-delay:.2s; }
+.confetti i:nth-child(9) { --x:210px;--r:210deg;animation-delay:.08s; }
+.confetti i:nth-child(10) { --x:265px;--r:280deg;animation-delay:.16s; }
+@keyframes victory-pop { from{opacity:0;transform:scale(.45) rotate(-12deg)} to{opacity:1;transform:scale(1) rotate(0)} }
+@keyframes confetti-fall {
+  0% { opacity:0;transform:translate(0,-35px) rotate(0); }
+  15% { opacity:1; }
+  100% { opacity:0;transform:translate(var(--x),230px) rotate(var(--r)); }
+}
 .main-action {
   min-width:210px;
   min-height:58px;
@@ -177,6 +246,8 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
   .calendar-button { min-height:32px;padding:5px 10px; }
   .work-screen { min-height:calc(100svh - 120px);padding:24px 15px 40px; }
   .clock { font-size:clamp(62px,21vw,100px); }
+  .decision-actions { flex-direction:column;align-items:stretch; }
+  .decision-actions button { width:100%; }
   .limit-controls { flex-wrap:wrap; }
   .limit-controls button { min-height:44px; }
   .ticker-track span { min-width:calc(100vw - 32px); }
@@ -187,4 +258,5 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 @media (prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important;transition:none!important; }
   .ticker-track { animation:none; }
+  .victory-mark,.confetti i { animation:none; }
 }

@@ -49,11 +49,24 @@
         </div>
       </div>
 
-      <div class="clock-stage">
+      <div class="clock-stage" id="clock-stage">
         <span class="clock-label" id="clock-label">今日剩餘</span>
         <div class="clock" id="clock" aria-live="polite">08:00:00</div>
         <p class="clock-hint" id="clock-hint">上限 8 小時 · 尚未開始</p>
         <div class="progress-track" aria-label="今日工作進度"><span id="progress"></span></div>
+      </div>
+
+      <div class="limit-reached" id="limit-reached" role="status" aria-live="assertive" hidden>
+        <div class="confetti" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="victory-mark" aria-hidden="true">✓</div>
+        <h2 id="reached-title">今日工作已達限額</h2>
+        <p id="reached-question">是否停止工作？</p>
+        <div class="decision-actions">
+          <button class="stop-yes" id="confirm-stop" type="button">是，停止工作</button>
+          <button class="continue-overtime" id="continue-overtime" type="button">繼續工作</button>
+        </div>
       </div>
 
       <button class="main-action" id="main-action" type="button">開始工作</button>
@@ -93,6 +106,6 @@
     <p class="calendar-note">每一格顯示當天累計工作時長。</p>
   </dialog>
 
-  <script src="./app.js?v=5"></script>
+  <script src="./app.js?v=6"></script>
 </body>
 </html>
