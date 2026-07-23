@@ -279,6 +279,28 @@ function confirmStop() {
   render();
 }
 
+function recordedSeconds(record, key) {
+  if (record?.limitState === "finished" && Number.isFinite(record.finalSeconds)) {
+    return Math.max(0, Math.floor(record.finalSeconds));
+  }
+  return key === activeDate ? workedSeconds(record) : Math.max(0, Math.floor(record?.workedSeconds || 0));
+}
+
+function finishToday() {
+  const record = getRecord();
+  commitElapsed(record);
+  const total = workedSeconds(record);
+  record.finalSeconds = total;
+  record.finishedOvertime = record.limitState === "overtime" || total > record.limitSeconds;
+  record.workedSeconds = 0;
+  record.runningSince = null;
+  record.limitState = "finished";
+  saveStore();
+  $("end-work-dialog").close();
+  showTicker(`今天已記錄 ${formatDuration(total)}，工作結束。`);
+  render();
+}
+
 function renderMuteButton() {
   const muted = Boolean(store.muted);
   $("mute-toggle").textContent = muted ? "已靜音" : "聲音開啟";
@@ -336,29 +358,38 @@ function render() {
   }
   const remaining = record.limitSeconds - worked;
   const atLimitDecision = record.limitState === "awaiting" || record.limitState === "stopped";
+  const finished = record.limitState === "finished";
   const overtime = record.limitState === "overtime" && remaining <= 0;
   const hasStarted = worked > 0 || Boolean(record.runningSince);
 
   checkReminders(record, worked);
   $("app").classList.toggle("is-overtime", overtime);
   $("app").classList.toggle("is-celebrating", record.limitState === "awaiting");
-  $("today-worked").textContent = formatClock(worked);
-  $("clock-label").textContent = overtime ? "今天已超時工作" : "今日剩餘";
-  $("clock").textContent = overtime ? `+${formatClock(Math.abs(remaining))}` : formatClock(remaining);
-  $("progress").style.width = `${Math.min(100, worked / record.limitSeconds * 100)}%`;
+  $("today-worked").textContent = finished ? "00:00:00" : formatClock(worked);
+  $("clock-label").textContent = finished ? "今日工作已結束" : overtime ? "今天已超時工作" : "今日剩餘";
+  $("clock").textContent = finished ? "00:00:00" : overtime ? `+${formatClock(Math.abs(remaining))}` : formatClock(remaining);
+  $("progress").style.width = finished ? "0%" : `${Math.min(100, worked / record.limitSeconds * 100)}%`;
   $("state-label").textContent = record.runningSince ? (overtime ? "已超過今天的工作邊界" : "正在累計今天的工作時間") : hasStarted ? "計時已暫停，休息不會算入工作" : "為今天設定一個清楚的終點";
-  $("clock-hint").textContent = `${record.runningSince ? "工作中" : hasStarted ? "已暫停" : "尚未開始"} · 上限 ${formatDuration(record.limitSeconds)}`;
+  $("clock-hint").textContent = finished ? `已記錄 ${formatDuration(record.finalSeconds || 0)}` : `${record.runningSince ? "工作中" : hasStarted ? "已暫停" : "尚未開始"} · 上限 ${formatDuration(record.limitSeconds)}`;
   $("main-action").textContent = record.runningSince ? "暫停工作" : hasStarted ? "繼續工作" : "開始工作";
   $("main-action").classList.toggle("pause-mode", Boolean(record.runningSince));
   $("clock-stage").hidden = atLimitDecision;
   $("limit-reached").hidden = !atLimitDecision;
-  $("main-action").hidden = atLimitDecision;
-  $("edit-limit").hidden = atLimitDecision || Boolean(record.runningSince) || !$("limit-panel").hidden;
+  $("main-action").hidden = atLimitDecision || finished;
+  $("edit-limit").hidden = atLimitDecision || finished || Boolean(record.runningSince) || !$("limit-panel").hidden;
+  $("end-work").hidden = finished || !hasStarted;
   $("confirm-stop").hidden = record.limitState === "stopped";
   $("reached-question").textContent = record.limitState === "stopped" ? "很好，今天的工作已經停止。" : "是否停止工作？";
   renderMuteButton();
 
-  if (atLimitDecision) {
+  if (finished) {
+    $("limit-panel").hidden = true;
+    $("state-label").textContent = "今天辛苦了，工作記錄已保存";
+    clearTimeout(tickerTimer);
+    $("ticker-text").textContent = "今天的工作已結束，時長已保存到工作日曆。";
+    $("ticker-copy").textContent = $("ticker-text").textContent;
+    $("ticker").hidden = false;
+  } else if (atLimitDecision) {
     $("limit-panel").hidden = true;
     $("state-label").textContent = record.limitState === "stopped" ? "今天的工作已經完成" : "做到了，現在可以安心停下來";
     $("ticker").hidden = true;
@@ -381,7 +412,7 @@ function monthRecords(year, month) {
 
 function totalForEntries(entries) {
   return entries.reduce((sum, [key, record]) => {
-    return sum + (key === activeDate ? workedSeconds(record) : Math.floor(record.workedSeconds || 0));
+    return sum + recordedSeconds(record, key);
   }, 0);
 }
 
@@ -408,9 +439,9 @@ function renderCalendar() {
   for (let day = 1; day <= days; day += 1) {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const record = recordMap.get(key);
-    const seconds = record ? (key === activeDate ? workedSeconds(record) : record.workedSeconds || 0) : 0;
+    const seconds = record ? recordedSeconds(record, key) : 0;
     const isOvertime = Boolean(
-      record && (record.limitState === "overtime" || seconds > record.limitSeconds)
+      record && (record.finishedOvertime || record.limitState === "overtime" || seconds > record.limitSeconds)
     );
     const cell = document.createElement("div");
     const workStatus = seconds ? (isOvertime ? " overtime" : " worked") : "";
@@ -422,6 +453,12 @@ function renderCalendar() {
 }
 
 $("main-action").addEventListener("click", toggleWork);
+$("end-work").addEventListener("click", () => $("end-work-dialog").showModal());
+$("confirm-finish").addEventListener("click", finishToday);
+$("cancel-finish").addEventListener("click", () => $("end-work-dialog").close());
+$("end-work-dialog").addEventListener("click", (event) => {
+  if (event.target === $("end-work-dialog")) $("end-work-dialog").close();
+});
 $("confirm-stop").addEventListener("click", confirmStop);
 $("continue-overtime").addEventListener("click", continueOvertime);
 $("mute-toggle").addEventListener("click", () => {
@@ -469,7 +506,7 @@ migrateOldSessions();
 recoverOvernightRun();
 const initialRecord = getRecord();
 syncLimitInputs(initialRecord);
-$("limit-panel").hidden = workedSeconds(initialRecord) > 0 || Boolean(initialRecord.runningSince);
+$("limit-panel").hidden = initialRecord.limitState === "finished" || workedSeconds(initialRecord) > 0 || Boolean(initialRecord.runningSince);
 render();
 setInterval(render, 1000);
 document.addEventListener("visibilitychange", () => {

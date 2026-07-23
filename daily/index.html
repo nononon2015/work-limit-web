@@ -18,7 +18,7 @@
   <meta name="twitter:description" content="每天的工作，要有上限。">
   <meta name="twitter:image" content="https://nononon2015.github.io/work-limit-web/daily/og.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=2">
+  <link rel="stylesheet" href="./style.css?v=3">
   <title>到點就停｜每日工作限時</title>
 </head>
 <body>
@@ -71,6 +71,7 @@
 
       <button class="main-action" id="main-action" type="button">開始工作</button>
       <button class="edit-limit" id="edit-limit" type="button" hidden>修改今日上限</button>
+      <button class="end-work-button" id="end-work" type="button" hidden>結束工作</button>
 
       <div class="ticker" id="ticker" role="status" aria-live="polite" hidden>
         <div class="ticker-track"><span id="ticker-text"></span><span aria-hidden="true" id="ticker-copy"></span></div>
@@ -106,6 +107,16 @@
     <p class="calendar-note">每一格顯示當天累計工作時長。</p>
   </dialog>
 
-  <script src="./app.js?v=7"></script>
+  <dialog class="end-work-dialog" id="end-work-dialog">
+    <p class="eyebrow">今日收尾</p>
+    <h2>是否結束今天的工作？</h2>
+    <p>確認後計時會清零，今天的工作時長會保存到工作日曆。</p>
+    <div class="confirm-icons">
+      <button class="confirm-finish" id="confirm-finish" type="button" aria-label="確認結束工作" title="確認結束工作">✓</button>
+      <button class="cancel-finish" id="cancel-finish" type="button" aria-label="取消" title="取消">×</button>
+    </div>
+  </dialog>
+
+  <script src="./app.js?v=8"></script>
 </body>
 </html>

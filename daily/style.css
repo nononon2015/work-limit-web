@@ -194,6 +194,16 @@ button { cursor:pointer; }
 .main-action.pause-mode { background:#263a30; }
 .is-overtime .main-action.pause-mode { background:var(--red); }
 .edit-limit { margin-top:12px; }
+.end-work-button {
+  margin-top:12px;
+  padding:9px 15px;
+  border:1px solid #d8aaa4;
+  border-radius:999px;
+  color:#97382f;
+  background:rgba(255,255,255,.48);
+  font-size:12px;
+  font-weight:750;
+}
 .ticker {
   width:min(660px,calc(100vw - 32px));
   margin-top:26px;
@@ -240,6 +250,36 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 .calendar-day.overtime strong { color:#8f3028; }
 .calendar-day.today { outline:2px solid var(--green);outline-offset:-2px; }
 .calendar-note { margin:14px 0 0;color:var(--muted);font-size:11px;text-align:center; }
+.end-work-dialog {
+  width:min(440px,calc(100% - 28px));
+  padding:30px 24px 26px;
+  border:1px solid var(--line);
+  border-radius:24px;
+  color:var(--ink);
+  background:var(--card);
+  box-shadow:0 30px 100px rgba(23,32,27,.25);
+  text-align:center;
+}
+.end-work-dialog::backdrop { background:rgba(22,29,25,.46);backdrop-filter:blur(5px); }
+.end-work-dialog .eyebrow { margin-bottom:8px; }
+.end-work-dialog h2 { margin:0;font-family:Georgia,"Songti TC","Songti SC",serif;font-size:28px; }
+.end-work-dialog>p:not(.eyebrow) { margin:13px auto 23px;max-width:330px;color:var(--muted);font-size:13px;line-height:1.7; }
+.confirm-icons { display:flex;justify-content:center;gap:18px; }
+.confirm-icons button {
+  display:grid;
+  place-items:center;
+  width:64px;
+  height:64px;
+  border:0;
+  border-radius:50%;
+  color:#fff;
+  font-size:31px;
+  font-weight:800;
+  transition:transform .15s;
+}
+.confirm-icons button:active { transform:scale(.95); }
+.confirm-finish { background:#3f765d; }
+.cancel-finish { background:#9a9f9b; }
 [hidden] { display:none!important; }
 @media (max-width:640px) {
   .topbar { padding:16px;align-items:flex-start; }
