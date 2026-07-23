@@ -1,19 +1,11 @@
 {
-  "name": "到點就停｜每日工作限時",
-  "short_name": "到點就停",
-  "description": "為每天的工作設定上限，時間到了就停下來。",
+  "name": "到点就停｜工作限时器",
+  "short_name": "到点就停",
+  "description": "给工作设一个终点，保护你的休息时间。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f0e8",
   "theme_color": "#f4f0e8",
-  "lang": "zh-Hant",
-  "icons": [
-    {
-      "src": "./icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "lang": "zh-CN"
 }
