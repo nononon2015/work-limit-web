@@ -195,20 +195,37 @@ button { cursor:pointer; }
 .is-overtime .main-action.pause-mode { background:var(--red); }
 .edit-limit { margin-top:12px; }
 .end-work-button {
+  position:fixed;
+  z-index:5;
+  left:50%;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  min-height:38px;
+  margin:0;
+  padding:0 16px;
+  transform:translateX(-50%);
+  border:1.5px solid #315f4a;
+  border-radius:999px;
+  color:#315f4a;
+  background:#fff;
+  font-size:12px;
+  font-weight:750;
+  transition:transform .15s,filter .15s;
+}
+.end-work-button:hover { filter:brightness(.97); }
+.end-work-button:active { transform:translateX(-50%) scale(.98); }
+.end-work-button.overtime-size {
+  position:static;
   min-width:210px;
   min-height:58px;
   margin-top:10px;
   padding:0 32px;
-  border:2px solid #315f4a;
+  transform:none;
+  border-width:2px;
   border-radius:18px;
-  color:#315f4a;
-  background:#fff;
   font-size:16px;
   font-weight:800;
-  transition:transform .15s,filter .15s;
 }
-.end-work-button:hover { filter:brightness(.97); }
-.end-work-button:active { transform:scale(.98); }
+.end-work-button.overtime-size:active { transform:scale(.98); }
 .ticker {
   width:min(660px,calc(100vw - 32px));
   margin-top:26px;

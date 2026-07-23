@@ -378,6 +378,7 @@ function render() {
   $("main-action").hidden = atLimitDecision || finished;
   $("edit-limit").hidden = atLimitDecision || finished || Boolean(record.runningSince) || !$("limit-panel").hidden;
   $("end-work").hidden = finished || !hasStarted;
+  $("end-work").classList.toggle("overtime-size", overtime);
   $("confirm-stop").hidden = record.limitState === "stopped";
   $("reached-question").textContent = record.limitState === "stopped" ? "很好，今天的工作已經停止。" : "是否停止工作？";
   renderMuteButton();
