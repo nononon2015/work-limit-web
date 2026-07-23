@@ -198,7 +198,7 @@ button { cursor:pointer; }
   position:fixed;
   z-index:5;
   left:50%;
-  bottom:calc(16px + env(safe-area-inset-bottom));
+  bottom:calc(72px + env(safe-area-inset-bottom));
   min-height:38px;
   margin:0;
   padding:0 16px;
