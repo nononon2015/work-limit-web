@@ -1,78 +1,340 @@
 const $ = (id) => document.getElementById(id);
-const state = { duration:45, phase:"idle", remaining:2700, overtime:0, endAt:null, pausedRemaining:0, announced:false };
-let sessions = JSON.parse(localStorage.getItem("stopwork-sessions") || "[]");
-const labels = { idle:"保护你的下班时间", running:"专注进行中", paused:"暂时暂停", overtime:"已经超时" };
+const STORAGE_KEY = "stopwork-daily-v2";
+const OLD_STORAGE_KEY = "stopwork-sessions";
+const DEFAULT_LIMIT = 8 * 60 * 60;
 
-function formatClock(seconds) {
-  const value = Math.max(0, Math.floor(seconds));
-  return `${String(Math.floor(value / 60)).padStart(2,"0")}:${String(value % 60).padStart(2,"0")}`;
-}
-function todaySessions() {
-  const today = new Date().toLocaleDateString("zh-CN");
-  return sessions.filter((item) => new Date(item.finishedAt).toLocaleDateString("zh-CN") === today);
-}
-function renderStats() {
-  const today = todaySessions();
-  const minutes = today.reduce((sum,item) => sum + item.minutes, 0);
-  $("today-minutes").textContent = minutes;
-  $("session-count").textContent = today.length;
-  $("work-minutes").textContent = minutes;
-  $("overtime-minutes").textContent = today.reduce((sum,item) => sum + item.overtime, 0);
-}
-function render() {
-  const active = ["running","paused","overtime"].includes(state.phase);
-  $("app").classList.toggle("is-overtime", state.phase === "overtime");
-  $("state-label").textContent = labels[state.phase] || "这一段结束了";
-  $("duration-picker").hidden = active || state.phase === "finished";
-  $("pause").hidden = !["running","paused"].includes(state.phase);
-  $("pause").textContent = state.phase === "paused" ? "继续" : "暂停";
-  $("main-action").textContent = state.phase === "idle" ? "开始工作" : state.phase === "finished" ? "开始下一段" : "结束工作";
-  $("main-action").classList.toggle("danger", state.phase === "overtime");
-  const progress = state.phase === "idle" ? 0 : Math.min(1, 1 - state.remaining / (state.duration * 60));
-  $("progress").style.width = `${progress * 100}%`;
-  if (state.phase === "finished") return;
-  $("clock-label").textContent = state.phase === "overtime" ? "超时" : "剩余";
-  $("clock").textContent = state.phase === "overtime" ? `+${formatClock(state.overtime)}` : formatClock(state.remaining);
-  $("clock-hint").textContent = state.phase === "idle" ? `准备开始 ${state.duration} 分钟的工作` : state.phase === "overtime" ? "请结束手上的工作" : state.phase === "paused" ? "计时已暂停" : "专心做这一件事";
-}
-async function start() {
-  if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
-  state.phase = "running"; state.remaining = state.duration * 60; state.overtime = 0; state.endAt = Date.now() + state.remaining * 1000; state.announced = false;
-  $("notice").hidden = true; render();
-}
-function finish() {
-  const worked = Math.max(1, Math.round((state.duration * 60 - state.remaining + state.overtime) / 60));
-  sessions.unshift({ id:Date.now(), minutes:worked, overtime:Math.ceil(state.overtime / 60), finishedAt:new Date().toISOString() });
-  sessions = sessions.slice(0,30); localStorage.setItem("stopwork-sessions",JSON.stringify(sessions));
-  state.endAt = null; state.phase = "finished";
-  $("timer-state").innerHTML = `<div class="finish-state"><span>✓</span><h2>这一段结束了</h2><p>${state.overtime ? `本次超时 ${Math.ceil(state.overtime / 60)} 分钟。下次到点就停。` : "做得好。现在离开工作，认真休息。"}</p></div>`;
-  renderStats(); render();
-}
-function reset() { location.reload(); }
+let store = loadStore();
+let activeDate = dateKey();
+let calendarCursor = new Date();
+let tickerTimer;
 
-document.querySelectorAll("[data-minutes]").forEach((button) => button.addEventListener("click", () => {
-  state.duration = Number(button.dataset.minutes); state.remaining = state.duration * 60;
-  document.querySelectorAll("[data-minutes]").forEach((item) => item.classList.toggle("selected", item === button)); render();
-}));
-$("main-action").addEventListener("click", () => state.phase === "idle" ? start() : state.phase === "finished" ? reset() : finish());
-$("pause").addEventListener("click", () => {
-  if (state.phase === "running") { state.pausedRemaining = state.remaining; state.endAt = null; state.phase = "paused"; }
-  else { state.endAt = Date.now() + state.pausedRemaining * 1000; state.phase = "running"; }
-  render();
-});
-setInterval(() => {
-  if (!state.endAt || !["running","overtime"].includes(state.phase)) return;
-  const delta = Math.ceil((state.endAt - Date.now()) / 1000);
-  if (delta > 0) state.remaining = delta;
-  else {
-    state.remaining = 0; state.overtime = Math.abs(delta); state.phase = "overtime";
-    if (!state.announced) {
-      state.announced = true; $("notice").textContent = "工作时间到了。保存精力，现在就停下来休息。"; $("notice").hidden = false;
-      navigator.vibrate?.([250,120,250]);
-      if ("Notification" in window && Notification.permission === "granted") new Notification("工作时间到了",{body:"请停止工作，给自己留出恢复时间。"});
-    }
+function dateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function loadStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (parsed?.records) return parsed;
+  } catch (_) {
+    // Start with a clean device-local store if saved data is invalid.
   }
+  return { version: 2, records: {}, migrated: false };
+}
+
+function saveStore() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+function getRecord(key = activeDate) {
+  if (!store.records[key]) {
+    store.records[key] = {
+      workedSeconds: 0,
+      limitSeconds: DEFAULT_LIMIT,
+      runningSince: null,
+      reminders: []
+    };
+  }
+  return store.records[key];
+}
+
+function migrateOldSessions() {
+  if (store.migrated) return;
+  try {
+    const oldSessions = JSON.parse(localStorage.getItem(OLD_STORAGE_KEY) || "[]");
+    oldSessions.forEach((session) => {
+      if (!session.finishedAt || !Number.isFinite(Number(session.minutes))) return;
+      const key = dateKey(new Date(session.finishedAt));
+      const record = getRecord(key);
+      record.workedSeconds += Math.max(0, Number(session.minutes) * 60);
+    });
+  } catch (_) {
+    // Old data is optional; a failed migration must not stop the timer.
+  }
+  store.migrated = true;
+  saveStore();
+}
+
+function workedSeconds(record = getRecord()) {
+  const live = record.runningSince ? Math.max(0, (Date.now() - record.runningSince) / 1000) : 0;
+  return Math.floor(record.workedSeconds + live);
+}
+
+function formatClock(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function formatDuration(totalSeconds, compact = false) {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (compact) {
+    if (hours && minutes) return `${hours}時${minutes}分`;
+    if (hours) return `${hours}時`;
+    return minutes ? `${minutes}分` : "—";
+  }
+  if (hours && minutes) return `${hours} 小時 ${minutes} 分鐘`;
+  if (hours) return `${hours} 小時`;
+  return `${minutes} 分鐘`;
+}
+
+function commitElapsed(record = getRecord()) {
+  if (!record.runningSince) return;
+  record.workedSeconds += Math.max(0, Math.floor((Date.now() - record.runningSince) / 1000));
+  record.runningSince = null;
+}
+
+function recoverOvernightRun() {
+  const runningEntry = Object.entries(store.records).find(
+    ([key, record]) => key !== activeDate && record.runningSince
+  );
+  if (!runningEntry) return;
+
+  let [key, record] = runningEntry;
+  let cursor = Number(record.runningSince);
+  const inheritedLimit = record.limitSeconds || DEFAULT_LIMIT;
+  record.runningSince = null;
+
+  while (key !== activeDate) {
+    const boundary = new Date(cursor);
+    boundary.setHours(24, 0, 0, 0);
+    record.workedSeconds += Math.max(0, Math.floor((boundary.getTime() - cursor) / 1000));
+    cursor = boundary.getTime();
+    key = dateKey(boundary);
+    record = getRecord(key);
+    if (!record.limitSeconds) record.limitSeconds = inheritedLimit;
+  }
+  record.runningSince = cursor;
+  saveStore();
+}
+
+function rollOverIfNeeded() {
+  const nowKey = dateKey();
+  if (nowKey === activeDate) return;
+
+  const previous = getRecord(activeDate);
+  const wasRunning = Boolean(previous.runningSince);
+  if (wasRunning) {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    previous.workedSeconds += Math.max(0, Math.floor((midnight.getTime() - previous.runningSince) / 1000));
+    previous.runningSince = null;
+  }
+
+  const previousLimit = previous.limitSeconds || DEFAULT_LIMIT;
+  activeDate = nowKey;
+  const today = getRecord();
+  if (!today.limitSeconds) today.limitSeconds = previousLimit;
+  if (wasRunning && !today.runningSince) {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    today.runningSince = midnight.getTime();
+  }
+  saveStore();
+}
+
+function reminderCandidates(record, worked) {
+  const remaining = record.limitSeconds - worked;
+  const candidates = [
+    { key: "third", due: worked >= record.limitSeconds / 3, text: "今天的工作時間已使用三分之一。" },
+    { key: "half", due: worked >= record.limitSeconds / 2, text: "今天的工作時間已使用一半。" },
+    { key: "two-thirds", due: worked >= record.limitSeconds * 2 / 3, text: "今天的工作時間已使用三分之二。" },
+    { key: "30-minutes", due: remaining <= 30 * 60 && remaining > 0, text: "距離今日工作上限還有 30 分鐘，請開始收尾。" },
+    { key: "10-minutes", due: remaining <= 10 * 60 && remaining > 0, text: "距離今日工作上限只剩 10 分鐘。" },
+    { key: "5-minutes", due: remaining <= 5 * 60 && remaining > 0, text: "最後 5 分鐘，請保存工作並準備停止。" },
+    { key: "overtime", due: remaining <= 0, text: "今天已超時工作，現在就停下來休息。" }
+  ];
+  return candidates.filter((item) => item.due && !record.reminders.includes(item.key));
+}
+
+function checkReminders(record, worked) {
+  if (!record.runningSince) return;
+  const due = reminderCandidates(record, worked);
+  if (!due.length) return;
+
+  due.forEach((item) => record.reminders.push(item.key));
+  saveStore();
+  const reminder = due[due.length - 1];
+  broadcast(reminder.text, reminder.key === "overtime");
+}
+
+function broadcast(message, persistent = false) {
+  $("ticker-text").textContent = message;
+  $("ticker-copy").textContent = message;
+  $("ticker").hidden = false;
+  navigator.vibrate?.(persistent ? [300, 140, 300, 140, 500] : [220, 100, 220]);
+
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+  }
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("到點就停", { body: message, icon: "./icon.svg" });
+  }
+
+  clearTimeout(tickerTimer);
+  if (!persistent) {
+    tickerTimer = setTimeout(() => {
+      $("ticker").hidden = true;
+    }, 14000);
+  }
+}
+
+async function toggleWork() {
+  rollOverIfNeeded();
+  const record = getRecord();
+  if (record.runningSince) {
+    commitElapsed(record);
+  } else {
+    if ("Notification" in window && Notification.permission === "default") {
+      try { await Notification.requestPermission(); } catch (_) {}
+    }
+    record.runningSince = Date.now();
+    $("limit-panel").hidden = true;
+  }
+  saveStore();
   render();
-},250);
-renderStats(); render();
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => undefined);
+}
+
+function setLimit() {
+  const hours = Math.max(0, Math.min(23, Number($("limit-hours").value) || 0));
+  const minutes = Math.max(0, Math.min(59, Number($("limit-minutes").value) || 0));
+  const total = hours * 3600 + minutes * 60;
+  if (total < 60) {
+    broadcast("工作上限至少要設定 1 分鐘。");
+    return;
+  }
+  const record = getRecord();
+  record.limitSeconds = total;
+  record.reminders = [];
+  saveStore();
+  $("limit-panel").hidden = true;
+  $("edit-limit").hidden = Boolean(record.runningSince);
+  render();
+}
+
+function render() {
+  rollOverIfNeeded();
+  const record = getRecord();
+  const worked = workedSeconds(record);
+  const remaining = record.limitSeconds - worked;
+  const overtime = remaining <= 0;
+  const hasStarted = worked > 0 || Boolean(record.runningSince);
+
+  checkReminders(record, worked);
+  $("app").classList.toggle("is-overtime", overtime);
+  $("today-worked").textContent = formatClock(worked);
+  $("clock-label").textContent = overtime ? "今天已超時工作" : "今日剩餘";
+  $("clock").textContent = overtime ? `+${formatClock(Math.abs(remaining))}` : formatClock(remaining);
+  $("progress").style.width = `${Math.min(100, worked / record.limitSeconds * 100)}%`;
+  $("state-label").textContent = record.runningSince ? (overtime ? "已超過今天的工作邊界" : "正在累計今天的工作時間") : hasStarted ? "計時已暫停，休息不會算入工作" : "為今天設定一個清楚的終點";
+  $("clock-hint").textContent = `${record.runningSince ? "工作中" : hasStarted ? "已暫停" : "尚未開始"} · 上限 ${formatDuration(record.limitSeconds)}`;
+  $("main-action").textContent = record.runningSince ? "暫停工作" : hasStarted ? "繼續工作" : "開始工作";
+  $("main-action").classList.toggle("pause-mode", Boolean(record.runningSince));
+  $("edit-limit").hidden = Boolean(record.runningSince) || !$("limit-panel").hidden;
+  $("limit-hours").value = Math.floor(record.limitSeconds / 3600);
+  $("limit-minutes").value = Math.floor((record.limitSeconds % 3600) / 60);
+
+  if (overtime) {
+    clearTimeout(tickerTimer);
+    $("ticker-text").textContent = "今天已超時工作，請保存手上的內容，現在就停止工作。";
+    $("ticker-copy").textContent = $("ticker-text").textContent;
+    $("ticker").hidden = false;
+  }
+
+  if ($("calendar-dialog").open) renderCalendar();
+}
+
+function monthRecords(year, month) {
+  return Object.entries(store.records).filter(([key]) => {
+    const [recordYear, recordMonth] = key.split("-").map(Number);
+    return recordYear === year && recordMonth === month + 1;
+  });
+}
+
+function totalForEntries(entries) {
+  return entries.reduce((sum, [key, record]) => {
+    return sum + (key === activeDate ? workedSeconds(record) : Math.floor(record.workedSeconds || 0));
+  }, 0);
+}
+
+function renderCalendar() {
+  const year = calendarCursor.getFullYear();
+  const month = calendarCursor.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+  const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
+  const entries = monthRecords(year, month);
+  const recordMap = new Map(entries);
+  const yearEntries = Object.entries(store.records).filter(([key]) => Number(key.slice(0, 4)) === year);
+
+  $("month-title").textContent = `${year} 年 ${month + 1} 月`;
+  $("month-total").textContent = formatDuration(totalForEntries(entries));
+  $("year-total").textContent = formatDuration(totalForEntries(yearEntries));
+  $("calendar-grid").replaceChildren();
+
+  for (let index = 0; index < firstDay; index += 1) {
+    const blank = document.createElement("span");
+    blank.className = "calendar-day blank";
+    $("calendar-grid").append(blank);
+  }
+
+  for (let day = 1; day <= days; day += 1) {
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const record = recordMap.get(key);
+    const seconds = record ? (key === activeDate ? workedSeconds(record) : record.workedSeconds || 0) : 0;
+    const cell = document.createElement("div");
+    cell.className = `calendar-day${key === activeDate ? " today" : ""}${seconds ? " worked" : ""}`;
+    cell.innerHTML = `<span>${day}</span><strong>${formatDuration(seconds, true)}</strong>`;
+    cell.title = `${key}：${formatDuration(seconds)}`;
+    $("calendar-grid").append(cell);
+  }
+}
+
+$("main-action").addEventListener("click", toggleWork);
+$("save-limit").addEventListener("click", setLimit);
+$("edit-limit").addEventListener("click", () => {
+  $("limit-panel").hidden = false;
+  $("edit-limit").hidden = true;
+});
+document.querySelectorAll("[data-limit-hours]").forEach((button) => {
+  button.addEventListener("click", () => {
+    $("limit-hours").value = button.dataset.limitHours;
+    $("limit-minutes").value = 0;
+  });
+});
+
+$("open-calendar").addEventListener("click", () => {
+  calendarCursor = new Date();
+  renderCalendar();
+  $("calendar-dialog").showModal();
+});
+$("close-calendar").addEventListener("click", () => $("calendar-dialog").close());
+$("calendar-dialog").addEventListener("click", (event) => {
+  if (event.target === $("calendar-dialog")) $("calendar-dialog").close();
+});
+$("prev-month").addEventListener("click", () => {
+  calendarCursor.setMonth(calendarCursor.getMonth() - 1);
+  renderCalendar();
+});
+$("next-month").addEventListener("click", () => {
+  calendarCursor.setMonth(calendarCursor.getMonth() + 1);
+  renderCalendar();
+});
+
+migrateOldSessions();
+recoverOvernightRun();
+const initialRecord = getRecord();
+$("limit-panel").hidden = workedSeconds(initialRecord) > 0 || Boolean(initialRecord.runningSince);
+render();
+setInterval(render, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) render();
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => undefined);
