@@ -44,7 +44,7 @@ button { cursor:pointer; }
 .brand { display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;letter-spacing:.04em;white-space:nowrap; }
 .brand-mark { display:grid;place-items:center;width:34px;height:34px;border-radius:11px;color:#fff;background:var(--green); }
 .top-actions { display:flex;align-items:center;gap:10px; }
-.calendar-button,.today-worked {
+.calendar-button,.mute-button,.today-worked {
   min-height:38px;
   padding:8px 13px;
   border:1px solid var(--line);
@@ -53,6 +53,7 @@ button { cursor:pointer; }
   background:rgba(255,255,255,.52);
   font-size:12px;
 }
+.mute-button[aria-pressed="true"] { color:#fff;border-color:var(--green);background:var(--green); }
 .today-worked { display:flex;align-items:center;gap:6px; }
 .today-worked strong { color:var(--ink);font-variant-numeric:tabular-nums; }
 .work-screen {

@@ -176,26 +176,42 @@ function checkReminders(record, worked) {
   broadcast(reminder.text, reminder.key === "overtime");
 }
 
-function broadcast(message, persistent = false) {
+function showTicker(message, persistent = false) {
   $("ticker-text").textContent = message;
   $("ticker-copy").textContent = message;
   $("ticker").hidden = false;
-  navigator.vibrate?.(persistent ? [300, 140, 300, 140, 500] : [220, 100, 220]);
-
-  if ("speechSynthesis" in window) {
-    speechSynthesis.cancel();
-    speechSynthesis.speak(new SpeechSynthesisUtterance(message));
-  }
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("到點就停", { body: message, icon: "./icon.svg" });
-  }
-
   clearTimeout(tickerTimer);
   if (!persistent) {
     tickerTimer = setTimeout(() => {
       $("ticker").hidden = true;
     }, 14000);
   }
+}
+
+function broadcast(message, persistent = false) {
+  showTicker(message, persistent);
+
+  if (!store.muted) {
+    navigator.vibrate?.(persistent ? [300, 140, 300, 140, 500] : [220, 100, 220]);
+    if ("speechSynthesis" in window) {
+      speechSynthesis.cancel();
+      speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+    }
+  }
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("到點就停", {
+      body: message,
+      icon: "./icon.svg",
+      silent: Boolean(store.muted)
+    });
+  }
+}
+
+function renderMuteButton() {
+  const muted = Boolean(store.muted);
+  $("mute-toggle").textContent = muted ? "已靜音" : "語音開啟";
+  $("mute-toggle").setAttribute("aria-pressed", String(muted));
+  $("mute-toggle").title = muted ? "點擊恢復語音提醒" : "點擊關閉語音和震動";
 }
 
 async function toggleWork() {
@@ -256,6 +272,7 @@ function render() {
   $("main-action").textContent = record.runningSince ? "暫停工作" : hasStarted ? "繼續工作" : "開始工作";
   $("main-action").classList.toggle("pause-mode", Boolean(record.runningSince));
   $("edit-limit").hidden = Boolean(record.runningSince) || !$("limit-panel").hidden;
+  renderMuteButton();
 
   if (overtime) {
     clearTimeout(tickerTimer);
@@ -313,6 +330,16 @@ function renderCalendar() {
 }
 
 $("main-action").addEventListener("click", toggleWork);
+$("mute-toggle").addEventListener("click", () => {
+  store.muted = !store.muted;
+  saveStore();
+  if (store.muted) {
+    window.speechSynthesis?.cancel();
+    navigator.vibrate?.(0);
+  }
+  renderMuteButton();
+  showTicker(store.muted ? "已靜音：只顯示文字和無聲通知。" : "語音提醒已恢復。");
+});
 $("save-limit").addEventListener("click", setLimit);
 $("edit-limit").addEventListener("click", () => {
   syncLimitInputs();
