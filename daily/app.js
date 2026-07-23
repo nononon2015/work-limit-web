@@ -220,6 +220,11 @@ function setLimit() {
   render();
 }
 
+function syncLimitInputs(record = getRecord()) {
+  $("limit-hours").value = Math.floor(record.limitSeconds / 3600);
+  $("limit-minutes").value = Math.floor((record.limitSeconds % 3600) / 60);
+}
+
 function render() {
   rollOverIfNeeded();
   const record = getRecord();
@@ -239,8 +244,6 @@ function render() {
   $("main-action").textContent = record.runningSince ? "暫停工作" : hasStarted ? "繼續工作" : "開始工作";
   $("main-action").classList.toggle("pause-mode", Boolean(record.runningSince));
   $("edit-limit").hidden = Boolean(record.runningSince) || !$("limit-panel").hidden;
-  $("limit-hours").value = Math.floor(record.limitSeconds / 3600);
-  $("limit-minutes").value = Math.floor((record.limitSeconds % 3600) / 60);
 
   if (overtime) {
     clearTimeout(tickerTimer);
@@ -300,6 +303,7 @@ function renderCalendar() {
 $("main-action").addEventListener("click", toggleWork);
 $("save-limit").addEventListener("click", setLimit);
 $("edit-limit").addEventListener("click", () => {
+  syncLimitInputs();
   $("limit-panel").hidden = false;
   $("edit-limit").hidden = true;
 });
@@ -331,6 +335,7 @@ $("next-month").addEventListener("click", () => {
 migrateOldSessions();
 recoverOvernightRun();
 const initialRecord = getRecord();
+syncLimitInputs(initialRecord);
 $("limit-panel").hidden = workedSeconds(initialRecord) > 0 || Boolean(initialRecord.runningSince);
 render();
 setInterval(render, 1000);
