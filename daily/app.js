@@ -437,7 +437,7 @@ function render() {
   $("limit-reached").hidden = !atLimitDecision;
   $("main-action").hidden = atLimitDecision || finished;
   $("edit-limit").hidden = atLimitDecision || finished || Boolean(record.runningSince) || !$("limit-panel").hidden;
-  $("end-work").hidden = finished || !hasStarted;
+  $("end-work").hidden = finished || atLimitDecision || !hasStarted;
   $("end-work").textContent = overtime ? "結束工作" : "提前結束";
   $("end-work").classList.toggle("overtime-size", overtime);
   $("confirm-stop").hidden = record.limitState === "stopped";
