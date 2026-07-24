@@ -324,16 +324,15 @@ function continueOvertime() {
 }
 
 function confirmStop() {
+  ensureAudioContext();
   const record = getRecord();
   record.workedSeconds = record.limitSeconds;
   record.runningSince = null;
   record.limitState = "stopped";
   saveStore();
-  playTones([
-    { frequency: 659.25, duration: 0.22, gap: 0.11 },
-    { frequency: 987.77, duration: 0.38 }
-  ]);
   render();
+  playVictoryFanfare();
+  showFinishCelebration(record.limitSeconds);
 }
 
 function recordedSeconds(record, key) {
