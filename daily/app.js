@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = "stopwork-daily-v2";
 const OLD_STORAGE_KEY = "stopwork-sessions";
 const DEFAULT_LIMIT = 8 * 60 * 60;
+const DECISION_TIMEOUT_MS = 10 * 1000;
 
 let store = loadStore();
 let activeDate = dateKey();
@@ -297,6 +298,7 @@ function enterLimitReached(record) {
   record.workedSeconds = record.limitSeconds;
   record.runningSince = null;
   record.limitState = "awaiting";
+  record.decisionStartedAt = Date.now();
   if (!record.reminders.includes("limit-reached")) record.reminders.push("limit-reached");
   saveStore();
   playTones([
@@ -319,8 +321,18 @@ function continueOvertime() {
   record.workedSeconds = Math.max(record.limitSeconds, record.workedSeconds);
   record.limitState = "overtime";
   record.runningSince = Date.now();
+  delete record.decisionStartedAt;
   saveStore();
   render();
+}
+
+function autoStartOvertime(record) {
+  const startedAt = Number(record.decisionStartedAt) || Date.now();
+  record.workedSeconds = Math.max(record.limitSeconds, record.workedSeconds);
+  record.limitState = "overtime";
+  record.runningSince = startedAt;
+  delete record.decisionStartedAt;
+  saveStore();
 }
 
 function confirmStop() {
@@ -329,6 +341,7 @@ function confirmStop() {
   record.workedSeconds = record.limitSeconds;
   record.runningSince = null;
   record.limitState = "stopped";
+  delete record.decisionStartedAt;
   saveStore();
   render();
   playVictoryFanfare();
@@ -352,6 +365,7 @@ function finishToday() {
   record.workedSeconds = 0;
   record.runningSince = null;
   record.limitState = "finished";
+  delete record.decisionStartedAt;
   saveStore();
   $("end-work-dialog").close();
   showTicker(`今天已記錄 ${formatDuration(total)}，工作結束。`);
@@ -415,6 +429,16 @@ function render() {
     enterLimitReached(record);
     worked = workedSeconds(record);
   }
+  if (record.limitState === "awaiting") {
+    if (!Number.isFinite(record.decisionStartedAt)) {
+      record.decisionStartedAt = Date.now();
+      saveStore();
+    }
+    if (Date.now() - record.decisionStartedAt >= DECISION_TIMEOUT_MS) {
+      autoStartOvertime(record);
+      worked = workedSeconds(record);
+    }
+  }
   const remaining = record.limitSeconds - worked;
   const atLimitDecision = record.limitState === "awaiting" || record.limitState === "stopped";
   const finished = record.limitState === "finished";
@@ -440,7 +464,12 @@ function render() {
   $("end-work").textContent = overtime ? "結束工作" : "提前結束";
   $("end-work").classList.toggle("overtime-size", overtime);
   $("confirm-stop").hidden = record.limitState === "stopped";
-  $("reached-question").textContent = record.limitState === "stopped" ? "很好，今天的工作已經停止。" : "是否停止工作？";
+  const decisionSecondsLeft = record.limitState === "awaiting"
+    ? Math.max(0, Math.ceil((DECISION_TIMEOUT_MS - (Date.now() - record.decisionStartedAt)) / 1000))
+    : 0;
+  $("reached-question").textContent = record.limitState === "stopped"
+    ? "很好，今天的工作已經停止。"
+    : `是否停止工作？${decisionSecondsLeft} 秒後將自動開始記錄超時。`;
   renderMuteButton();
 
   if (finished) {
