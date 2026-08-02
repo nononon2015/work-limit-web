@@ -3,6 +3,7 @@ const STORAGE_KEY = "stopwork-daily-v2";
 const OLD_STORAGE_KEY = "stopwork-sessions";
 const DEFAULT_LIMIT = 8 * 60 * 60;
 const DECISION_TIMEOUT_MS = 10 * 1000;
+const UNDO_FINISH_MS = 10 * 1000;
 
 let store = loadStore();
 let activeDate = dateKey();
@@ -358,8 +359,16 @@ function recordedSeconds(record, key) {
 function finishToday() {
   ensureAudioContext();
   const record = getRecord();
+  const wasRunning = Boolean(record.runningSince);
+  const previousLimitState = record.limitState || null;
   commitElapsed(record);
   const total = workedSeconds(record);
+  record.finishUndo = {
+    expiresAt: Date.now() + UNDO_FINISH_MS,
+    workedSeconds: total,
+    limitState: previousLimitState,
+    wasRunning
+  };
   record.finalSeconds = total;
   record.finishedOvertime = record.limitState === "overtime" || total > record.limitSeconds;
   record.workedSeconds = 0;
@@ -372,6 +381,30 @@ function finishToday() {
   render();
   playVictoryFanfare();
   showFinishCelebration(total);
+}
+
+function undoFinishToday() {
+  const record = getRecord();
+  const snapshot = record.finishUndo;
+  if (!snapshot || Date.now() >= snapshot.expiresAt) {
+    delete record.finishUndo;
+    saveStore();
+    render();
+    return;
+  }
+
+  record.workedSeconds = Math.max(0, Number(snapshot.workedSeconds) || 0);
+  record.runningSince = snapshot.wasRunning ? Date.now() : null;
+  if (snapshot.limitState) record.limitState = snapshot.limitState;
+  else delete record.limitState;
+  delete record.finalSeconds;
+  delete record.finishedOvertime;
+  delete record.finishUndo;
+  saveStore();
+  clearTimeout(finishCelebrationTimer);
+  $("finish-celebration").hidden = true;
+  render();
+  showTicker("已撤銷結束，工作計時已恢復。");
 }
 
 function renderMuteButton() {
@@ -472,6 +505,18 @@ function render() {
     : `是否停止工作？${decisionSecondsLeft} 秒後將自動開始記錄超時。`;
   renderMuteButton();
 
+  const undoSecondsLeft = finished && record.finishUndo
+    ? Math.max(0, Math.ceil((record.finishUndo.expiresAt - Date.now()) / 1000))
+    : 0;
+  const canUndoFinish = undoSecondsLeft > 0;
+  $("undo-finish").hidden = !canUndoFinish;
+  if (canUndoFinish) {
+    $("undo-finish-text").textContent = `已結束，${undoSecondsLeft} 秒內可撤銷`;
+  } else if (record.finishUndo) {
+    delete record.finishUndo;
+    saveStore();
+  }
+
   if (finished) {
     $("limit-panel").hidden = true;
     $("state-label").textContent = "今天辛苦了，工作記錄已保存";
@@ -506,6 +551,17 @@ function totalForEntries(entries) {
   }, 0);
 }
 
+function currentWeekEntries() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const startKey = dateKey(start);
+  const endKey = dateKey(end);
+  return Object.entries(store.records).filter(([key]) => key >= startKey && key <= endKey);
+}
+
 function renderCalendar() {
   const year = calendarCursor.getFullYear();
   const month = calendarCursor.getMonth();
@@ -516,6 +572,7 @@ function renderCalendar() {
   const yearEntries = Object.entries(store.records).filter(([key]) => Number(key.slice(0, 4)) === year);
 
   $("month-title").textContent = `${year} 年 ${month + 1} 月`;
+  $("week-total").textContent = formatDuration(totalForEntries(currentWeekEntries()));
   $("month-total").textContent = formatDuration(totalForEntries(entries));
   $("year-total").textContent = formatDuration(totalForEntries(yearEntries));
   $("calendar-grid").replaceChildren();
@@ -546,6 +603,7 @@ $("main-action").addEventListener("click", toggleWork);
 $("end-work").addEventListener("click", () => $("end-work-dialog").showModal());
 $("confirm-finish").addEventListener("click", finishToday);
 $("cancel-finish").addEventListener("click", () => $("end-work-dialog").close());
+$("undo-finish-button").addEventListener("click", undoFinishToday);
 $("finish-celebration").addEventListener("click", () => {
   clearTimeout(finishCelebrationTimer);
   $("finish-celebration").hidden = true;

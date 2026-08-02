@@ -18,7 +18,7 @@
   <meta name="twitter:description" content="每天的工作，要有上限。">
   <meta name="twitter:image" content="https://nononon2015.github.io/work-limit-web/daily/og.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=7">
+  <link rel="stylesheet" href="./style.css?v=8">
   <title>到點就停｜每日工作限時</title>
 </head>
 <body>
@@ -83,6 +83,11 @@
     </footer>
   </main>
 
+  <div class="undo-finish" id="undo-finish" role="status" aria-live="polite" hidden>
+    <span id="undo-finish-text">今天的工作已結束</span>
+    <button id="undo-finish-button" type="button">撤銷結束</button>
+  </div>
+
   <dialog class="calendar-dialog" id="calendar-dialog">
     <div class="calendar-head">
       <div>
@@ -92,6 +97,7 @@
       <button class="close-calendar" id="close-calendar" type="button" aria-label="關閉">×</button>
     </div>
     <div class="calendar-totals">
+      <article><span>本週</span><strong id="week-total">0 小時</strong></article>
       <article><span>本月</span><strong id="month-total">0 小時</strong></article>
       <article><span>本年</span><strong id="year-total">0 小時</strong></article>
     </div>
@@ -131,6 +137,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=14"></script>
+  <script src="./app.js?v=15"></script>
 </body>
 </html>
