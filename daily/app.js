@@ -295,11 +295,11 @@ function showFinishCelebration(total) {
   }, 3500);
 }
 
-function enterLimitReached(record) {
+function enterLimitReached(record, reachedAt = Date.now()) {
   record.workedSeconds = record.limitSeconds;
   record.runningSince = null;
   record.limitState = "awaiting";
-  record.decisionStartedAt = Date.now();
+  record.decisionStartedAt = reachedAt;
   if (!record.reminders.includes("limit-reached")) record.reminders.push("limit-reached");
   saveStore();
   playTones([
@@ -459,7 +459,11 @@ function render() {
   const record = getRecord();
   let worked = workedSeconds(record);
   if (!record.limitState && worked >= record.limitSeconds) {
-    enterLimitReached(record);
+    const secondsUntilLimit = Math.max(0, record.limitSeconds - record.workedSeconds);
+    const reachedAt = record.runningSince
+      ? record.runningSince + secondsUntilLimit * 1000
+      : Date.now();
+    enterLimitReached(record, reachedAt);
     worked = workedSeconds(record);
   }
   if (record.limitState === "awaiting") {
