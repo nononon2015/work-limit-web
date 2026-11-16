@@ -283,7 +283,7 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 .month-nav button { width:36px;height:36px;border:1px solid var(--line);border-radius:11px;background:transparent; }
 .weekday-row,.calendar-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:6px; }
 .weekday-row { margin-bottom:6px;color:var(--muted);text-align:center;font-size:11px; }
-.calendar-day { min-height:66px;padding:8px;border:1px solid transparent;border-radius:12px;color:var(--muted);background:#f7f4ed; }
+.calendar-day { min-height:66px;padding:8px;border:1px solid transparent;border-radius:12px;color:var(--muted);background:#f7f4ed;font:inherit;text-align:left; }
 .calendar-day>span { display:block;font-size:11px; }
 .calendar-day strong { display:block;margin-top:10px;color:var(--ink);font-size:11px;white-space:nowrap; }
 .calendar-day.blank { visibility:hidden; }
@@ -291,6 +291,9 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 .calendar-day.overtime { border-color:#e2b8b2;background:#f4deda; }
 .calendar-day.overtime strong { color:#8f3028; }
 .calendar-day.today { outline:2px solid var(--green);outline-offset:-2px; }
+.calendar-day.adjusted::after { content:"已調整";display:block;margin-top:4px;color:var(--green);font-size:8px;font-weight:800; }
+.calendar-day:not(:disabled) { cursor:pointer; }
+.calendar-day:disabled { cursor:default;opacity:.58; }
 .calendar-note { margin:14px 0 0;color:var(--muted);font-size:11px;text-align:center; }
 .end-work-dialog {
   width:min(440px,calc(100% - 28px));
@@ -322,6 +325,37 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
 .confirm-icons button:active { transform:scale(.95); }
 .confirm-finish { background:#3f765d; }
 .cancel-finish { background:#9a9f9b; }
+.adjust-time-dialog {
+  position:relative;
+  width:min(480px,calc(100% - 28px));
+  padding:28px 24px 25px;
+  border:1px solid var(--line);
+  border-radius:24px;
+  color:var(--ink);
+  background:var(--card);
+  box-shadow:0 30px 100px rgba(23,32,27,.25);
+  text-align:center;
+}
+.adjust-time-dialog::backdrop { background:rgba(22,29,25,.46);backdrop-filter:blur(5px); }
+.adjust-time-dialog .eyebrow { margin-bottom:6px; }
+.adjust-time-dialog h2 { margin:0;font-family:Georgia,"Songti TC","Songti SC",serif;font-size:27px; }
+.close-adjust-time { position:absolute;top:16px;right:16px;width:36px;height:36px;border:0;border-radius:50%;color:var(--muted);background:#eeeae2;font-size:24px;line-height:1; }
+.adjust-time-summary { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:22px 0 18px; }
+.adjust-time-summary article { padding:14px;border:1px solid var(--line);border-radius:15px;background:#f7f4ed; }
+.adjust-time-summary span { display:block;margin-bottom:4px;color:var(--muted);font-size:11px; }
+.adjust-time-summary strong { font-size:17px; }
+.adjust-help { margin:0 0 13px;color:var(--muted);font-size:12px; }
+.adjust-time-inputs { display:flex;justify-content:center;gap:10px; }
+.adjust-time-inputs label { display:flex;align-items:center;gap:6px;padding:0 12px;border:1px solid var(--line);border-radius:13px;background:#fff; }
+.adjust-time-inputs input { width:48px;padding:12px 0;border:0;outline:0;text-align:right;background:transparent;font-variant-numeric:tabular-nums; }
+.adjust-time-inputs small { color:var(--muted);font-size:11px; }
+.adjust-error { margin:12px 0 0;color:var(--red);font-size:12px; }
+.prepare-adjustment { min-width:180px;min-height:48px;margin-top:18px;border:0;border-radius:14px;color:#fff;background:#315f4a;font-weight:800; }
+.adjust-confirm p { margin:9px auto 19px;max-width:350px;line-height:1.7; }
+.adjust-confirm-actions { display:flex;justify-content:center;gap:10px; }
+.adjust-confirm-actions button { min-height:46px;padding:0 18px;border-radius:13px;font-weight:800; }
+.confirm-adjustment { border:0;color:#fff;background:#315f4a; }
+.cancel-adjustment { border:1px solid var(--line);color:var(--muted);background:transparent; }
 .finish-celebration {
   position:fixed;
   z-index:100;
@@ -417,6 +451,8 @@ footer { padding:18px;text-align:center;color:var(--muted);font-size:11px; }
   .calendar-totals strong { font-size:16px; }
   .calendar-day { min-height:55px;padding:6px 4px; }
   .calendar-day strong { font-size:9px; }
+  .calendar-day.adjusted::after { font-size:7px; }
+  .adjust-time-dialog { padding:25px 16px 21px; }
 }
 @media (prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important;transition:none!important; }

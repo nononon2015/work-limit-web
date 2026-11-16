@@ -11,6 +11,8 @@ let calendarCursor = new Date();
 let tickerTimer;
 let finishCelebrationTimer;
 let audioContext;
+let editingDateKey = null;
+let pendingManualSeconds = null;
 
 function dateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -349,11 +351,19 @@ function confirmStop() {
   showFinishCelebration(record.limitSeconds);
 }
 
-function recordedSeconds(record, key) {
+function systemRecordedSeconds(record, key) {
+  if (!record) return 0;
   if (record?.limitState === "finished" && Number.isFinite(record.finalSeconds)) {
     return Math.max(0, Math.floor(record.finalSeconds));
   }
   return key === activeDate ? workedSeconds(record) : Math.max(0, Math.floor(record?.workedSeconds || 0));
+}
+
+function recordedSeconds(record, key) {
+  if (Number.isFinite(record?.manualSeconds)) {
+    return Math.max(0, Math.min(24 * 3600, Math.floor(record.manualSeconds)));
+  }
+  return systemRecordedSeconds(record, key);
 }
 
 function finishToday() {
@@ -566,6 +576,65 @@ function currentWeekEntries() {
   return Object.entries(store.records).filter(([key]) => key >= startKey && key <= endKey);
 }
 
+function formatDateLabel(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return `${year} 年 ${month} 月 ${day} 日`;
+}
+
+function canAdjustDate(key, record) {
+  if (key > activeDate) return false;
+  if (key < activeDate) return true;
+  return record?.limitState === "finished";
+}
+
+function openTimeAdjustment(key) {
+  const record = store.records[key];
+  if (!canAdjustDate(key, record)) return;
+  const systemSeconds = systemRecordedSeconds(record, key);
+  const currentSeconds = recordedSeconds(record, key);
+  editingDateKey = key;
+  pendingManualSeconds = null;
+  $("adjust-date-title").textContent = formatDateLabel(key);
+  $("system-time-value").textContent = formatDuration(systemSeconds);
+  $("current-time-value").textContent = formatDuration(currentSeconds);
+  $("adjust-hours").value = Math.floor(currentSeconds / 3600);
+  $("adjust-minutes").value = Math.floor((currentSeconds % 3600) / 60);
+  $("adjust-error").hidden = true;
+  $("adjust-time-form").hidden = false;
+  $("adjust-confirm").hidden = true;
+  $("adjust-time-dialog").showModal();
+}
+
+function prepareTimeAdjustment() {
+  const hours = Number($("adjust-hours").value);
+  const minutes = Number($("adjust-minutes").value);
+  const invalid = !Number.isInteger(hours) || !Number.isInteger(minutes)
+    || hours < 0 || hours > 24 || minutes < 0 || minutes > 59
+    || (hours === 24 && minutes !== 0);
+  if (invalid) {
+    $("adjust-error").textContent = "請輸入 0–24 小時；設定為 24 小時時，分鐘必須為 0。";
+    $("adjust-error").hidden = false;
+    return;
+  }
+  pendingManualSeconds = hours * 3600 + minutes * 60;
+  $("adjust-confirm-text").textContent = `確認將 ${formatDateLabel(editingDateKey)} 的工作時間調整為 ${formatDuration(pendingManualSeconds)}？`;
+  $("adjust-time-form").hidden = true;
+  $("adjust-confirm").hidden = false;
+}
+
+function confirmTimeAdjustment() {
+  if (!editingDateKey || !Number.isFinite(pendingManualSeconds)) return;
+  const record = getRecord(editingDateKey);
+  record.manualSeconds = pendingManualSeconds;
+  record.manualUpdatedAt = Date.now();
+  saveStore();
+  $("adjust-time-dialog").close();
+  render();
+  showTicker(`${formatDateLabel(editingDateKey)} 已調整為 ${formatDuration(pendingManualSeconds)}。`);
+  editingDateKey = null;
+  pendingManualSeconds = null;
+}
+
 function renderCalendar() {
   const year = calendarCursor.getFullYear();
   const month = calendarCursor.getMonth();
@@ -591,14 +660,22 @@ function renderCalendar() {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const record = recordMap.get(key);
     const seconds = record ? recordedSeconds(record, key) : 0;
-    const isOvertime = Boolean(
-      record && (record.finishedOvertime || record.limitState === "overtime" || seconds > record.limitSeconds)
-    );
-    const cell = document.createElement("div");
+    const isAdjusted = Number.isFinite(record?.manualSeconds);
+    const isOvertime = Boolean(record && (
+      isAdjusted
+        ? seconds > record.limitSeconds
+        : record.finishedOvertime || record.limitState === "overtime" || seconds > record.limitSeconds
+    ));
+    const cell = document.createElement("button");
+    cell.type = "button";
     const workStatus = seconds ? (isOvertime ? " overtime" : " worked") : "";
-    cell.className = `calendar-day${key === activeDate ? " today" : ""}${workStatus}`;
+    cell.className = `calendar-day${key === activeDate ? " today" : ""}${workStatus}${isAdjusted ? " adjusted" : ""}`;
     cell.innerHTML = `<span>${day}</span><strong>${formatDuration(seconds, true)}</strong>`;
-    cell.title = `${key}：${formatDuration(seconds)}${isOvertime ? "（已超時）" : ""}`;
+    cell.disabled = !canAdjustDate(key, record);
+    cell.title = cell.disabled
+      ? (key > activeDate ? `${key}：未來日期不能調整` : `${key}：請先結束今天的工作再調整`)
+      : `${key}：${formatDuration(seconds)}${isOvertime ? "（已超時）" : ""}${isAdjusted ? "（已手動調整）" : "；點擊調整"}`;
+    cell.addEventListener("click", () => openTimeAdjustment(key));
     $("calendar-grid").append(cell);
   }
 }
@@ -607,6 +684,16 @@ $("main-action").addEventListener("click", toggleWork);
 $("end-work").addEventListener("click", () => $("end-work-dialog").showModal());
 $("confirm-finish").addEventListener("click", finishToday);
 $("cancel-finish").addEventListener("click", () => $("end-work-dialog").close());
+$("close-adjust-time").addEventListener("click", () => $("adjust-time-dialog").close());
+$("prepare-adjustment").addEventListener("click", prepareTimeAdjustment);
+$("confirm-adjustment").addEventListener("click", confirmTimeAdjustment);
+$("cancel-adjustment").addEventListener("click", () => {
+  $("adjust-time-form").hidden = false;
+  $("adjust-confirm").hidden = true;
+});
+$("adjust-time-dialog").addEventListener("click", (event) => {
+  if (event.target === $("adjust-time-dialog")) $("adjust-time-dialog").close();
+});
 $("undo-finish-button").addEventListener("click", undoFinishToday);
 $("finish-celebration").addEventListener("click", () => {
   clearTimeout(finishCelebrationTimer);

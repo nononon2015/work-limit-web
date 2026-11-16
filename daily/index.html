@@ -18,7 +18,7 @@
   <meta name="twitter:description" content="每天的工作，要有上限。">
   <meta name="twitter:image" content="https://nononon2015.github.io/work-limit-web/daily/og.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=8">
+  <link rel="stylesheet" href="./style.css?v=9">
   <title>到點就停｜每日工作限時</title>
 </head>
 <body>
@@ -110,7 +110,7 @@
       <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
     </div>
     <div class="calendar-grid" id="calendar-grid"></div>
-    <p class="calendar-note">每一格顯示當天累計工作時長。</p>
+    <p class="calendar-note">每一格顯示當天工作時長；點擊日期可手動調整。</p>
   </dialog>
 
   <dialog class="end-work-dialog" id="end-work-dialog">
@@ -120,6 +120,32 @@
     <div class="confirm-icons">
       <button class="confirm-finish" id="confirm-finish" type="button" aria-label="確認結束工作" title="確認結束工作">✓</button>
       <button class="cancel-finish" id="cancel-finish" type="button" aria-label="取消" title="取消">×</button>
+    </div>
+  </dialog>
+
+  <dialog class="adjust-time-dialog" id="adjust-time-dialog">
+    <button class="close-adjust-time" id="close-adjust-time" type="button" aria-label="關閉">×</button>
+    <p class="eyebrow">調整工作時間</p>
+    <h2 id="adjust-date-title"></h2>
+    <div class="adjust-time-summary">
+      <article><span>系統記錄</span><strong id="system-time-value">0 分鐘</strong></article>
+      <article><span>目前採用</span><strong id="current-time-value">0 分鐘</strong></article>
+    </div>
+    <div id="adjust-time-form">
+      <p class="adjust-help">可輸入 0–24 小時，精確到分鐘。</p>
+      <div class="adjust-time-inputs">
+        <label><input id="adjust-hours" type="number" min="0" max="24" value="0" inputmode="numeric"><small>小時</small></label>
+        <label><input id="adjust-minutes" type="number" min="0" max="59" value="0" inputmode="numeric"><small>分鐘</small></label>
+      </div>
+      <p class="adjust-error" id="adjust-error" hidden></p>
+      <button class="prepare-adjustment" id="prepare-adjustment" type="button">保存調整</button>
+    </div>
+    <div class="adjust-confirm" id="adjust-confirm" hidden>
+      <p id="adjust-confirm-text"></p>
+      <div class="adjust-confirm-actions">
+        <button class="confirm-adjustment" id="confirm-adjustment" type="button">確認</button>
+        <button class="cancel-adjustment" id="cancel-adjustment" type="button">返回修改</button>
+      </div>
     </div>
   </dialog>
 
@@ -137,6 +163,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=16"></script>
+  <script src="./app.js?v=17"></script>
 </body>
 </html>
